@@ -3662,6 +3662,19 @@ class SemanticsNode with DiagnosticableTreeMixin {
 
   bool _canPerformAction(SemanticsAction action) => _actions.containsKey(action);
 
+  /// Whether this node can perform the specific [CustomSemanticsAction]
+  /// identified by [actionId].
+  bool _canPerformCustomAction(int actionId) {
+    if (!_actions.containsKey(SemanticsAction.customAction)) {
+      return false;
+    }
+    final CustomSemanticsAction? customAction = CustomSemanticsAction.getAction(actionId);
+    if (customAction == null) {
+      return false;
+    }
+    return _customSemanticsActions.containsKey(customAction);
+  }
+
   static final SemanticsConfiguration _kEmptyConfig = SemanticsConfiguration();
 
   /// Reconfigures the properties of this object to describe the configuration
@@ -5024,11 +5037,21 @@ class SemanticsOwner extends ChangeNotifier {
     notifyListeners();
   }
 
-  SemanticsActionHandler? _getSemanticsActionHandlerForId(int id, SemanticsAction action) {
+  SemanticsActionHandler? _getSemanticsActionHandlerForId(
+    int id,
+    SemanticsAction action, [
+    Object? args,
+  ]) {
     SemanticsNode? result = _nodes[id];
     if (result != null && result.isPartOfNodeMerging && !result._canPerformAction(action)) {
       result._visitDescendants((SemanticsNode node) {
-        if (node._canPerformAction(action)) {
+        // For custom actions, check whether this node handles the *specific*
+        // custom action identified by args, not just any custom action.
+        final bool canHandle =
+            action == SemanticsAction.customAction && args is int
+                ? node._canPerformCustomAction(args)
+                : node._canPerformAction(action);
+        if (canHandle) {
           result = node;
           return false; // found node, abort walk
         }
@@ -5049,7 +5072,7 @@ class SemanticsOwner extends ChangeNotifier {
   /// If the given `action` requires arguments they need to be passed in via
   /// the `args` parameter.
   void performAction(int id, SemanticsAction action, [Object? args]) {
-    final SemanticsActionHandler? handler = _getSemanticsActionHandlerForId(id, action);
+    final SemanticsActionHandler? handler = _getSemanticsActionHandlerForId(id, action, args);
     if (handler != null) {
       handler(args);
       return;
@@ -5064,8 +5087,9 @@ class SemanticsOwner extends ChangeNotifier {
   SemanticsActionHandler? _getSemanticsActionHandlerForPosition(
     SemanticsNode node,
     Offset position,
-    SemanticsAction action,
-  ) {
+    SemanticsAction action, [
+    Object? args,
+  ]) {
     if (node.transform != null) {
       final inverse = Matrix4.identity();
       if (inverse.copyInverse(node.transform!) == 0.0) {
@@ -5082,7 +5106,12 @@ class SemanticsOwner extends ChangeNotifier {
       }
       SemanticsNode? result;
       node._visitDescendants((SemanticsNode child) {
-        if (child._canPerformAction(action)) {
+        // For custom actions, check the specific action id, not just any custom action.
+        final bool canHandle =
+            action == SemanticsAction.customAction && args is int
+                ? child._canPerformCustomAction(args)
+                : child._canPerformAction(action);
+        if (canHandle) {
           result = child;
           return false;
         }
@@ -5096,6 +5125,7 @@ class SemanticsOwner extends ChangeNotifier {
           child,
           position,
           action,
+          args,
         );
         if (handler != null) {
           return handler;
@@ -5121,6 +5151,7 @@ class SemanticsOwner extends ChangeNotifier {
       node,
       position,
       action,
+      args,
     );
     if (handler != null) {
       handler(args);
