@@ -127,6 +127,14 @@ fml::RefPtr<fml::TaskRunner> CreateNewThread(const std::string& name) {
   XCTAssertTrue(link.isPaused);
 }
 
+- (void)testInitWithNullTaskRunnerReturnsNil {
+  fml::RefPtr<fml::TaskRunner> nullRunner;
+  VSyncClient* vsyncClient = [[VSyncClient alloc]
+      initWithTaskRunner:nullRunner
+                callback:[](std::unique_ptr<flutter::FrameTimingsRecorder> recorder) {}];
+  XCTAssertNil(vsyncClient);
+}
+
 - (void)testReleasesLinkOnInvalidation {
   __weak CADisplayLink* weakLink;
   @autoreleasepool {
