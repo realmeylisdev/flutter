@@ -55,6 +55,18 @@ class LLDB {
   /// A list of log patterns to ignore.
   static final _ignorePatterns = <Pattern>[RegExp(r'\d+ location added to breakpoint \d+')];
 
+  /// Pattern to match LLDB version output.
+  ///
+  /// Example: lldb-1704.0.2.3
+  static final _lldbVersionPattern = RegExp(r'lldb-\d+');
+
+  /// LLDB versions known to have a breakpoint rearming bug that breaks JIT
+  /// page protection. Xcode 26.4 ships lldb-1704.x which randomly fails to
+  /// rearm the NOTIFY_DEBUGGER_ABOUT_RX_PAGES breakpoint.
+  ///
+  /// See https://github.com/flutter/flutter/issues/184254
+  static const _affectedLLDBVersionPrefix = 'lldb-1704';
+
   /// Breakpoint script required for JIT on iOS.
   ///
   /// This should match the "handle_new_rx_page" function in [IosProject._lldbPythonHelperTemplate].
@@ -111,7 +123,16 @@ return False
         return false;
       }
       await _selectDevice(deviceId);
-      await _setBreakpoint();
+      final bool affectedLLDB = await _isAffectedLLDBVersion();
+      if (affectedLLDB) {
+        _logger.printWarning(
+          'Skipping LLDB JIT breakpoint due to Xcode 26.4 LLDB bug '
+          '(https://github.com/flutter/flutter/issues/184254). '
+          'Debug mode will use the Dart interpreter instead of JIT.',
+        );
+      } else {
+        await _setBreakpoint();
+      }
       await _attachToAppProcess(appProcessId);
       await _resumeProcess();
       _isAttached = true;
@@ -216,6 +237,25 @@ return False
 
     await _lldbProcess?.stdinWriteln('device process attach --pid $appProcessId');
     await futureLog;
+  }
+
+  /// Checks if the LLDB version is affected by the Xcode 26.4 breakpoint bug.
+  ///
+  /// Xcode 26.4 ships an LLDB that randomly fails to rearm breakpoints after
+  /// they fire, which breaks the JIT page protection mechanism.
+  /// See https://github.com/flutter/flutter/issues/184254
+  Future<bool> _isAffectedLLDBVersion() async {
+    final Future<String> futureLog = _startWaitingForLog(
+      _lldbVersionPattern,
+    ).then((value) => value, onError: _handleAsyncError);
+
+    await _lldbProcess?.stdinWriteln('version');
+    final String log = await futureLog;
+    final bool isAffected = log.contains(_affectedLLDBVersionPrefix);
+    if (isAffected) {
+      _logger.printTrace('Detected affected LLDB version: $log');
+    }
+    return isAffected;
   }
 
   /// Sets a breakpoint, waits for it print the breakpoint id, and adds a python

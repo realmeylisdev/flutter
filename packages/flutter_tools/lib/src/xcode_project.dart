@@ -452,6 +452,15 @@ def handle_new_rx_page(frame: lldb.SBFrame, bp_loc, extra_args, intern_dict):
         return
 
 def __lldb_init_module(debugger: lldb.SBDebugger, _):
+    # Xcode 26.4 ships LLDB with a bug that randomly fails to rearm
+    # breakpoints, causing JIT page protection to silently fail.
+    # Skip the breakpoint so the VM falls back to the Dart interpreter.
+    # See https://github.com/flutter/flutter/issues/184254
+    version = debugger.GetVersionString()
+    if version and 'lldb-1704' in version:
+        print("-- LLDB integration SKIPPED (Xcode 26.4 breakpoint bug, see flutter/flutter#184254) --")
+        return
+
     target = debugger.GetDummyTarget()
     # Caveat: must use BreakpointCreateByRegEx here and not
     # BreakpointCreateByName. For some reasons callback function does not
