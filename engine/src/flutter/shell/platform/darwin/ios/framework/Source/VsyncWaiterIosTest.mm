@@ -143,4 +143,12 @@ fml::RefPtr<fml::TaskRunner> CreateNewThread(const std::string& name) {
   XCTAssertNil(weakLink);
 }
 
+- (void)testInitWithNullTaskRunnerReturnsNil {
+  fml::RefPtr<fml::TaskRunner> nullTaskRunner;
+  auto callback = [](std::unique_ptr<flutter::FrameTimingsRecorder> recorder) {};
+  VSyncClient* vsyncClient = [[VSyncClient alloc] initWithTaskRunner:nullTaskRunner
+                                                            callback:callback];
+  XCTAssertNil(vsyncClient);
+}
+
 @end

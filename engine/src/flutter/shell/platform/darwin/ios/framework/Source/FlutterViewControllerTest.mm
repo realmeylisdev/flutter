@@ -2676,4 +2676,31 @@ extern NSNotificationName const FlutterViewControllerWillDealloc;
   [appDelegate setMockLaunchEngine:nil];
 }
 
+- (void)testCreateTouchRateCorrectionVSyncClientDoesNotCrashWhenEngineHasNoShell {
+  id mockDisplayLinkManager = [OCMockObject mockForClass:[DisplayLinkManager class]];
+  double maxFrameRate = 120;
+  [[[mockDisplayLinkManager stub] andReturnValue:@(maxFrameRate)] displayRefreshRate];
+  // Create engine without running it — shell will be nil, so platformTaskRunner returns empty RefPtr.
+  FlutterEngine* engine = [[FlutterEngine alloc] init];
+  FlutterViewController* viewController = [[FlutterViewController alloc] initWithEngine:engine
+                                                                                nibName:nil
+                                                                                 bundle:nil];
+  // Should not crash even though engine has no shell.
+  [viewController createTouchRateCorrectionVSyncClientIfNeeded];
+  XCTAssertNil(viewController.touchRateCorrectionVSyncClient);
+}
+
+- (void)testSetUpKeyboardAnimationVsyncClientDoesNotCrashWhenEngineHasNoShell {
+  // Create engine without running it — shell will be nil, so uiTaskRunner returns empty RefPtr.
+  FlutterEngine* engine = [[FlutterEngine alloc] init];
+  FlutterViewController* viewController = [[FlutterViewController alloc] initWithEngine:engine
+                                                                                nibName:nil
+                                                                                 bundle:nil];
+  FlutterKeyboardAnimationCallback callback = ^(fml::TimePoint targetTime) {
+  };
+  // Should not crash even though engine has no shell.
+  [viewController setUpKeyboardAnimationVsyncClient:callback];
+  XCTAssertNil(viewController.keyboardAnimationVSyncClient);
+}
+
 @end

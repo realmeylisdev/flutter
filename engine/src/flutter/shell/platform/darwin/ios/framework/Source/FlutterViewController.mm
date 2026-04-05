@@ -1354,11 +1354,16 @@ static flutter::PointerData::DeviceKind DeviceKindFromTouchType(UITouch* touch) 
     return;
   }
 
+  fml::RefPtr<fml::TaskRunner> platformTaskRunner = self.engine.platformTaskRunner;
+  if (!platformTaskRunner) {
+    return;
+  }
+
   auto callback = [](std::unique_ptr<flutter::FrameTimingsRecorder> recorder) {
     // Do nothing in this block. Just trigger system to callback touch events with correct rate.
   };
   _touchRateCorrectionVSyncClient =
-      [[VSyncClient alloc] initWithTaskRunner:self.engine.platformTaskRunner callback:callback];
+      [[VSyncClient alloc] initWithTaskRunner:platformTaskRunner callback:callback];
   _touchRateCorrectionVSyncClient.allowPauseAfterVsync = NO;
 }
 
@@ -1934,7 +1939,12 @@ static flutter::PointerData::DeviceKind DeviceKindFromTouchType(UITouch* touch) 
     });
   };
 
-  _keyboardAnimationVSyncClient = [[VSyncClient alloc] initWithTaskRunner:self.engine.uiTaskRunner
+  fml::RefPtr<fml::TaskRunner> uiTaskRunner = self.engine.uiTaskRunner;
+  if (!uiTaskRunner) {
+    return;
+  }
+
+  _keyboardAnimationVSyncClient = [[VSyncClient alloc] initWithTaskRunner:uiTaskRunner
                                                                  callback:uiCallback];
   _keyboardAnimationVSyncClient.allowPauseAfterVsync = NO;
   [_keyboardAnimationVSyncClient await];
