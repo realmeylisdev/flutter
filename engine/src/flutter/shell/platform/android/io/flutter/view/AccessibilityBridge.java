@@ -658,11 +658,19 @@ public class AccessibilityBridge extends AccessibilityNodeProvider {
     if (rootAccessibilityView == null || rootAccessibilityView.getResources() == null) {
       return;
     }
-    int fontWeightAdjustment =
-        rootAccessibilityView.getResources().getConfiguration().fontWeightAdjustment;
-    boolean shouldBold =
-        fontWeightAdjustment != Configuration.FONT_WEIGHT_ADJUSTMENT_UNDEFINED
-            && fontWeightAdjustment >= BOLD_TEXT_WEIGHT_ADJUSTMENT;
+    boolean shouldBold;
+    try {
+      int fontWeightAdjustment =
+          rootAccessibilityView.getResources().getConfiguration().fontWeightAdjustment;
+      shouldBold =
+          fontWeightAdjustment != Configuration.FONT_WEIGHT_ADJUSTMENT_UNDEFINED
+              && fontWeightAdjustment >= BOLD_TEXT_WEIGHT_ADJUSTMENT;
+    } catch (NoSuchFieldError e) {
+      // Some vendor-modified Android runtimes report SDK_INT >= 31 but ship a
+      // Configuration class without the fontWeightAdjustment field (added in API 31).
+      // Gracefully degrade rather than crashing at app startup.
+      shouldBold = false;
+    }
 
     if (shouldBold) {
       accessibilityFeatureFlags |= AccessibilityFeature.BOLD_TEXT.value;
