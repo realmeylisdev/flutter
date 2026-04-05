@@ -382,6 +382,110 @@ void main() {
     });
   });
 
+  // Regression test for https://github.com/flutter/flutter/issues/184523.
+  //
+  // When an incompatible git binary is on PATH (e.g. from an AI agent or
+  // Xcode build action), `git ls-tree` can fail. Before the fix, the failure
+  // was masked by bash pipeline semantics and the empty-blob hash
+  // (e69de29bb2d1d6434b8b29ae775ad8c2e48c5391) was written to engine.stamp.
+  group('incompatible git (issue #184523)', () {
+    late Directory fakeGitDir;
+
+    setUp(() {
+      initGitRepoWithBlankInitialCommit();
+      setupRemote(remote: 'upstream');
+
+      // Find the real git binary path before we shadow it.
+      final String realGitPath = io.Process.runSync('which', <String>['git']).stdout.toString().trim();
+
+      // Create a fake git wrapper that fails on `ls-tree` (simulating a git
+      // binary that cannot read the repo's pack index format).
+      fakeGitDir = localFs.systemTempDirectory.createTempSync('fake_git.');
+      final File fakeGit = fakeGitDir.childFile('git');
+      fakeGit.writeAsStringSync(
+        '#!/bin/bash\n'
+        'for arg in "\$@"; do\n'
+        '  if [[ "\$arg" == "ls-tree" ]]; then\n'
+        '    echo "fatal: multi-pack-index version 2 not recognized" >&2\n'
+        '    exit 128\n'
+        '  fi\n'
+        'done\n'
+        'exec "$realGitPath" "\$@"\n',
+      );
+      io.Process.runSync('chmod', <String>['+x', fakeGit.path]);
+
+      // Prepend fake git to PATH so it shadows the real one.
+      final String currentPath = io.Platform.environment['PATH'] ?? '/usr/bin:/bin';
+      environment['PATH'] = '${fakeGitDir.path}:$currentPath';
+    });
+
+    test(
+      'fails with non-zero exit instead of writing empty-blob hash to engine.stamp',
+      () {
+        // Run directly (not via the run() helper) because we expect failure.
+        final String executable;
+        final List<String> args;
+        if (const LocalPlatform().isWindows) {
+          executable = 'powershell';
+          args = <String>[testRoot.binInternalUpdateEngineVersion.path];
+        } else if (usePowershellOnPosix) {
+          executable = 'pwsh';
+          args = <String>[testRoot.binInternalUpdateEngineVersion.path];
+        } else {
+          executable = testRoot.binInternalUpdateEngineVersion.path;
+          args = <String>[];
+        }
+
+        final io.ProcessResult result = io.Process.runSync(
+          executable,
+          args,
+          environment: environment,
+          workingDirectory: testRoot.root.absolute.path,
+          includeParentEnvironment: false,
+        );
+
+        // The script must fail rather than silently write a garbage hash.
+        expect(
+          result.exitCode,
+          isNot(0),
+          reason:
+              'Expected non-zero exit when git ls-tree fails, but got exit 0.\n'
+              'STDOUT:\n${result.stdout}\n'
+              'STDERR:\n${result.stderr}',
+        );
+
+        // If engine.stamp was written despite the failure, it must NOT contain
+        // the empty-blob hash that results from hashing empty input.
+        const String emptyBlobHash = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391';
+        if (testRoot.binCacheEngineStamp.existsSync()) {
+          expect(
+            testRoot.binCacheEngineStamp.readAsStringSync().trim(),
+            isNot(equals(emptyBlobHash)),
+            reason:
+                'engine.stamp contains the empty-blob hash, indicating that '
+                'the git ls-tree failure was silently swallowed.',
+          );
+        }
+
+        // Verify the error message mentions the incompatible git issue.
+        final String stderr = result.stderr as String;
+        expect(
+          stderr,
+          contains('git'),
+          reason: 'Error output should mention git to help users diagnose the issue.',
+        );
+      },
+      // This test creates a POSIX shell script wrapper; skip on Windows.
+      skip: const LocalPlatform().isWindows
+          ? 'Test uses a bash wrapper script, not applicable on Windows'
+          : null,
+    );
+
+    tearDown(() {
+      fakeGitDir.deleteSync(recursive: true);
+    });
+  });
+
   group('concurrent execution', () {
     setUp(() {
       initGitRepoWithBlankInitialCommit();

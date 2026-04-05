@@ -65,4 +65,23 @@ if [[ "$CURRENT_BRANCH" != "main" && \
   fi
 fi
 
-git -C "$FLUTTER_ROOT" ls-tree "$BASEREF" -- "${TRACKEDFILES[@]}" | git hash-object --stdin
+# Capture git ls-tree output separately so we can detect failures.
+# A pipeline would mask a non-zero exit from ls-tree (set -e only
+# checks the last command in a pipeline when pipefail is not set).
+# See https://github.com/flutter/flutter/issues/184523.
+TREE_OUTPUT="$(git -C "$FLUTTER_ROOT" ls-tree "$BASEREF" -- "${TRACKEDFILES[@]}")" || {
+  >&2 echo ""
+  >&2 echo "Error: Unable to compute the content hash of the Flutter SDK."
+  >&2 echo "'git ls-tree' failed for ref '$BASEREF'."
+  >&2 echo ""
+  >&2 echo "This is most commonly caused by an incompatible version of git."
+  >&2 echo "  git binary : $(command -v git)"
+  >&2 echo "  git version: $(git --version 2>/dev/null || echo 'unknown')"
+  >&2 echo ""
+  >&2 echo "If this Flutter SDK was cloned or last used with a different version of"
+  >&2 echo "git, ensure that version is available in your PATH, or re-clone the SDK"
+  >&2 echo "with the current version of git."
+  exit 1
+}
+
+echo "$TREE_OUTPUT" | git hash-object --stdin

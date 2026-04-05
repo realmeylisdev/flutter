@@ -70,15 +70,36 @@ if (($currentBranch -ne "main") -and
     }
 }
 
-# Removing the "cmd" requirement enables powershell usage on other hosts
-# 1. git ls-tree | Out-String - combines output of pipeline into a single string
-#    rather than an array for each line.
-#    "-NoNewline" not available on PS5.1 and also removes all newlines.
-# 2. -replace "`r`n", "`n"  - removes line endings
+# Capture git ls-tree output separately so we can detect failures.
+# See https://github.com/flutter/flutter/issues/184523.
+$treeOutput = (git -C "$flutterRoot" ls-tree "$baseRef" -- $trackedFiles 2>&1 | Out-String)
+if ($LASTEXITCODE -ne 0) {
+    $gitBinary = (Get-Command git -ErrorAction SilentlyContinue).Source
+    $gitVersion = (git --version 2>$null)
+    Write-Host @"
+
+Error: Unable to compute the content hash of the Flutter SDK.
+'git ls-tree' failed for ref '$baseRef'.
+
+This is most commonly caused by an incompatible version of git.
+  git binary : $gitBinary
+  git version: $gitVersion
+
+If this Flutter SDK was cloned or last used with a different version of
+git, ensure that version is available in your PATH, or re-clone the SDK
+with the current version of git.
+
+git ls-tree output:
+$treeOutput
+"@ -ForegroundColor Red
+    exit 1
+}
+
+# 1. -replace "`r`n", "`n"  - normalizes line endings
 #    NOTE: Out-String adds a new line; so Out-File -NoNewline strips that.
-# 3. Out-File -NoNewline -Encoding ascii outputs 8bit ascii
-# 4. git hash-object with stdin from a pipeline consumes UTF-16, so consume
-#.   the contents of hash.txt
-(git -C "$flutterRoot" ls-tree "$baseRef" -- $trackedFiles | Out-String) -replace "`r`n", "`n"  | Out-File -NoNewline -Encoding ascii hash.txt
+# 2. Out-File -NoNewline -Encoding ascii outputs 8bit ascii
+# 3. git hash-object with stdin from a pipeline consumes UTF-16, so consume
+#    the contents of hash.txt
+$treeOutput -replace "`r`n", "`n" | Out-File -NoNewline -Encoding ascii hash.txt
 git hash-object hash.txt
 Remove-Item hash.txt

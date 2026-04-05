@@ -63,6 +63,14 @@ else
   ENGINE_VERSION=$("$FLUTTER_ROOT/bin/internal/content_aware_hash.sh")
 fi
 
+# Validate that a non-empty engine version was determined.
+# See https://github.com/flutter/flutter/issues/184523.
+if [[ -z "$ENGINE_VERSION" ]]; then
+  >&2 echo "Error: Failed to determine the Flutter engine version."
+  >&2 echo "The content-aware hash script returned an empty result."
+  exit 1
+fi
+
 # Write the engine version out so downstream tools know what to look for.
 # Use a temporary file and atomic mv to prevent race conditions during parallel flutter executions.
 pid=$$

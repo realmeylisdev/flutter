@@ -62,6 +62,14 @@ if (![string]::IsNullOrEmpty($env:FLUTTER_PREBUILT_ENGINE_VERSION)) {
   $engineVersion = Invoke-Expression "& '$flutterRoot/bin/internal/content_aware_hash.ps1'"
 }
 
+# Validate that a non-empty engine version was determined.
+# See https://github.com/flutter/flutter/issues/184523.
+if ([string]::IsNullOrWhiteSpace($engineVersion)) {
+    Write-Host "Error: Failed to determine the Flutter engine version." -ForegroundColor Red
+    Write-Host "The content-aware hash script returned an empty result." -ForegroundColor Red
+    exit 1
+}
+
 # Write the engine version out so downstream tools know what to look for.
 # Use a temporary file and a retry logic to minimize chances of a race condition during
 # parallel flutter executions.
