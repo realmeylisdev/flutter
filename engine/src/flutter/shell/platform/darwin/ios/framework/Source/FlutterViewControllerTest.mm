@@ -2688,6 +2688,7 @@ extern NSNotificationName const FlutterViewControllerWillDealloc;
   // Should not crash even though engine has no shell.
   [viewController createTouchRateCorrectionVSyncClientIfNeeded];
   XCTAssertNil(viewController.touchRateCorrectionVSyncClient);
+  [mockDisplayLinkManager stopMocking];
 }
 
 - (void)testSetUpKeyboardAnimationVsyncClientDoesNotCrashWhenEngineHasNoShell {
