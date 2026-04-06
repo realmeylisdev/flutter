@@ -84,4 +84,9 @@ TREE_OUTPUT="$(git -C "$FLUTTER_ROOT" ls-tree "$BASEREF" -- "${TRACKEDFILES[@]}"
   exit 1
 }
 
-echo "$TREE_OUTPUT" | git hash-object --stdin
+if [ -n "$TREE_OUTPUT" ]; then
+  printf '%s\n' "$TREE_OUTPUT" | git hash-object --stdin
+else
+  >&2 echo "Error: 'git ls-tree' produced empty output for ref '$BASEREF'."
+  exit 1
+fi

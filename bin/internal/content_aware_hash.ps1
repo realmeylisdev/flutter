@@ -72,7 +72,7 @@ if (($currentBranch -ne "main") -and
 
 # Capture git ls-tree output separately so we can detect failures.
 # See https://github.com/flutter/flutter/issues/184523.
-$treeOutput = (git -C "$flutterRoot" ls-tree "$baseRef" -- $trackedFiles 2>&1 | Out-String)
+$treeOutput = (git -C "$flutterRoot" ls-tree "$baseRef" -- $trackedFiles 2>$null | Out-String)
 if ($LASTEXITCODE -ne 0) {
     $gitBinary = (Get-Command git -ErrorAction SilentlyContinue).Source
     $gitVersion = (git --version 2>$null)
