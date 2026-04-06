@@ -64,8 +64,11 @@ class LLDB {
   /// page protection. Xcode 26.4 ships lldb-1704.x which randomly fails to
   /// rearm the NOTIFY_DEBUGGER_ABOUT_RX_PAGES breakpoint.
   ///
+  /// Uses a negative lookahead to avoid false positives on future versions
+  /// like lldb-17040.
+  ///
   /// See https://github.com/flutter/flutter/issues/184254
-  static const _affectedLLDBVersionPrefix = 'lldb-1704';
+  static final _affectedLLDBVersionPattern = RegExp(r'lldb-1704(?!\d)');
 
   /// Breakpoint script required for JIT on iOS.
   ///
@@ -251,7 +254,7 @@ return False
 
     await _lldbProcess?.stdinWriteln('version');
     final String log = await futureLog;
-    final bool isAffected = log.contains(_affectedLLDBVersionPrefix);
+    final bool isAffected = _affectedLLDBVersionPattern.hasMatch(log);
     if (isAffected) {
       _logger.printTrace('Detected affected LLDB version: $log');
     }

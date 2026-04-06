@@ -456,8 +456,9 @@ def __lldb_init_module(debugger: lldb.SBDebugger, _):
     # breakpoints, causing JIT page protection to silently fail.
     # Skip the breakpoint so the VM falls back to the Dart interpreter.
     # See https://github.com/flutter/flutter/issues/184254
+    import re
     version = debugger.GetVersionString()
-    if version and 'lldb-1704' in version:
+    if version and re.search(r'lldb-1704(?!\d)', version):
         print("-- LLDB integration SKIPPED (Xcode 26.4 breakpoint bug, see flutter/flutter#184254) --")
         return
 
