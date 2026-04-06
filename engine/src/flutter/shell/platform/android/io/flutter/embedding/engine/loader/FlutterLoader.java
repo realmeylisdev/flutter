@@ -397,7 +397,7 @@ public class FlutterLoader {
 
           // Check if a boolean value is specified and if so, use it to determine if the
           // flags should be added. If the value is missing or unparseable, default to
-          // false (disabled), matching the pre-#182522 per-flag behavior.
+          // false (disabled) to ensure flags are only enabled when explicitly requested.
           if (applicationMetaData.getBoolean(metadataKey, false)) {
             shellArgs.add(arg);
           }
