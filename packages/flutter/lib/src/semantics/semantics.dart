@@ -3665,14 +3665,8 @@ class SemanticsNode with DiagnosticableTreeMixin {
   /// Whether this node can perform the specific [CustomSemanticsAction]
   /// identified by [actionId].
   bool _canPerformCustomAction(int actionId) {
-    if (!_actions.containsKey(SemanticsAction.customAction)) {
-      return false;
-    }
     final CustomSemanticsAction? customAction = CustomSemanticsAction.getAction(actionId);
-    if (customAction == null) {
-      return false;
-    }
-    return _customSemanticsActions.containsKey(customAction);
+    return customAction != null && _customSemanticsActions.containsKey(customAction);
   }
 
   static final SemanticsConfiguration _kEmptyConfig = SemanticsConfiguration();
@@ -5047,10 +5041,9 @@ class SemanticsOwner extends ChangeNotifier {
       result._visitDescendants((SemanticsNode node) {
         // For custom actions, check whether this node handles the *specific*
         // custom action identified by args, not just any custom action.
-        final bool canHandle =
-            action == SemanticsAction.customAction && args is int
-                ? node._canPerformCustomAction(args)
-                : node._canPerformAction(action);
+        final bool canHandle = action == SemanticsAction.customAction
+            ? (args is int && node._canPerformCustomAction(args))
+            : node._canPerformAction(action);
         if (canHandle) {
           result = node;
           return false; // found node, abort walk
@@ -5107,10 +5100,9 @@ class SemanticsOwner extends ChangeNotifier {
       SemanticsNode? result;
       node._visitDescendants((SemanticsNode child) {
         // For custom actions, check the specific action id, not just any custom action.
-        final bool canHandle =
-            action == SemanticsAction.customAction && args is int
-                ? child._canPerformCustomAction(args)
-                : child._canPerformAction(action);
+        final bool canHandle = action == SemanticsAction.customAction
+            ? (args is int && child._canPerformCustomAction(args))
+            : child._canPerformAction(action);
         if (canHandle) {
           result = child;
           return false;
