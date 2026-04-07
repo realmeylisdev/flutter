@@ -1122,9 +1122,7 @@ public class FlutterLoaderTest {
 
     // A key present with a null value should NOT enable the flag.
     testFlagFromMetadataNotPresent(
-        "io.flutter.embedding.android.EnableVulkanValidation",
-        null,
-        "--enable-vulkan-validation");
+        "io.flutter.embedding.android.EnableVulkanValidation", null, "--enable-vulkan-validation");
   }
 
   @Test
