@@ -26,6 +26,7 @@ import 'editable_text_tester.dart';
 import 'editable_text_utils.dart';
 import 'live_text_utils.dart';
 import 'semantics_tester.dart';
+import 'widgets_app_tester.dart';
 
 Matcher matchesMethodCall(String method, {dynamic args}) =>
     _MatchesMethodCall(method, arguments: args == null ? null : wrapMatcher(args));
@@ -5577,6 +5578,58 @@ void main() {
       await testByControls(materialTextSelectionControls);
       await testByControls(cupertinoTextSelectionControls);
     });
+  });
+
+  testWidgets('reporting error when Clipboard.setData fails in copySelection', (
+    WidgetTester tester,
+  ) async {
+    final errors = <FlutterErrorDetails>[];
+    final FlutterExceptionHandler? originalOnError = FlutterError.onError;
+    FlutterError.onError = (FlutterErrorDetails details) {
+      errors.add(details);
+    };
+    addTearDown(() {
+      FlutterError.onError = originalOnError;
+    });
+
+    final controller = TextEditingController(text: 'test data');
+    addTearDown(controller.dispose);
+    final focusNode = FocusNode();
+    addTearDown(focusNode.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EditableText(
+          backgroundCursorColor: Colors.grey,
+          controller: controller,
+          focusNode: focusNode,
+          style: textStyle,
+          cursorColor: cursorColor,
+        ),
+      ),
+    );
+
+    controller.selection = const TextSelection(baseOffset: 0, extentOffset: 4);
+    await tester.pump();
+
+    TestWidgetsFlutterBinding.ensureInitialized().defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (MethodCall methodCall) async {
+        if (methodCall.method == 'Clipboard.setData') {
+          throw Exception('Clipboard error');
+        }
+        return null;
+      },
+    );
+
+    final EditableTextState state = tester.state(find.byType(EditableText));
+    state.copySelection(SelectionChangedCause.toolbar);
+
+    await tester.idle();
+
+    expect(errors, isNotEmpty);
+    expect(errors.first.exception.toString(), contains('Clipboard error'));
+    expect(errors.first.context.toString(), contains('while copying selection'));
   });
 
   testWidgets('can set text with a11y', (WidgetTester tester) async {
@@ -18287,6 +18340,73 @@ void main() {
     controller.selection = const TextSelection.collapsed(offset: 0);
     await tester.pump();
   });
+
+  testWidgets(
+    'Prevent last character visibility in obscure text when obscureText is toggled on mobile',
+    (WidgetTester tester) async {
+      // Regression test for https://github.com/flutter/flutter/issues/184483.
+      var obscureText = true;
+      late StateSetter setState;
+
+      await tester.pumpWidget(
+        TestWidgetsApp(
+          home: StatefulBuilder(
+            builder: (BuildContext context, StateSetter stateSetter) {
+              setState = stateSetter;
+              return EditableText(
+                controller: controller,
+                backgroundCursorColor: const Color(0xFFF7F7F7),
+                focusNode: focusNode,
+                style: textStyle,
+                cursorColor: cursorColor,
+                obscureText: obscureText,
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(EditableText));
+      await tester.showKeyboard(find.byType(EditableText));
+      await tester.idle();
+
+      await tester.enterText(find.byType(EditableText), 'H');
+      await tester.pump();
+      await tester.enterText(find.byType(EditableText), 'HH');
+      await tester.pump();
+
+      expect((findRenderEditable(tester).text! as TextSpan).text, '•H');
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect((findRenderEditable(tester).text! as TextSpan).text, '••');
+
+      await tester.enterText(find.byType(EditableText), 'HHH');
+      await tester.pump();
+
+      expect((findRenderEditable(tester).text! as TextSpan).text, '••H');
+
+      // set obscureText = false.
+      setState(() {
+        obscureText = false;
+      });
+      await tester.pump();
+      expect((findRenderEditable(tester).text! as TextSpan).text, 'HHH');
+
+      // set obscureText = true.
+      setState(() {
+        obscureText = true;
+      });
+      await tester.pump();
+      expect((findRenderEditable(tester).text! as TextSpan).text, '•••');
+    },
+    // Reveal the latest character in an obscured field only on mobile.
+    variant: const TargetPlatformVariant(<TargetPlatform>{
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+      TargetPlatform.fuchsia,
+    }),
+  );
 }
 
 class UnsettableController extends TextEditingController {
