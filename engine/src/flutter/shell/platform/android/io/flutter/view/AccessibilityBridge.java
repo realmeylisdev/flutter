@@ -666,9 +666,16 @@ public class AccessibilityBridge extends AccessibilityNodeProvider {
           fontWeightAdjustment != Configuration.FONT_WEIGHT_ADJUSTMENT_UNDEFINED
               && fontWeightAdjustment >= BOLD_TEXT_WEIGHT_ADJUSTMENT;
     } catch (LinkageError e) {
-      // Some vendor-modified Android runtimes report SDK_INT >= 31 but ship a
-      // Configuration class without the fontWeightAdjustment field (added in API 31),
-      // or have other binary incompatibilities. Gracefully degrade rather than crashing.
+      // Observed on Android 11 devices including Pixel 4a and OnePlus 8 Pro: ART's
+      // class verifier eagerly resolves the Configuration.fontWeightAdjustment field
+      // reference (added in API 31) when loading AccessibilityBridge, so the
+      // SDK_INT >= 31 guard at the call site runs too late to prevent a
+      // NoSuchFieldError at startup. Catching the broader LinkageError also covers
+      // related VerifyError and IncompatibleClassChangeError failures on affected
+      // builds. AndroidX Compose hit the identical symptom on the same two devices
+      // and applied the same mitigation (AOSP b/353988277). This workaround can be
+      // removed once Flutter drops Android 11 support or when the access is moved
+      // into a dedicated @RequiresApi(31) helper class.
     }
 
     if (shouldBold) {
