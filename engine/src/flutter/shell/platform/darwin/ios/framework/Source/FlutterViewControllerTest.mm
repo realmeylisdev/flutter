@@ -2375,6 +2375,7 @@ extern NSNotificationName const FlutterViewControllerWillDealloc;
                                                                                  bundle:nil];
   [viewController createTouchRateCorrectionVSyncClientIfNeeded];
   XCTAssertNil(viewController.touchRateCorrectionVSyncClient);
+  [mockDisplayLinkManager stopMocking];
 }
 
 - (void)testSetUpKeyboardAnimationVsyncClientDoesNotCrashWhenEngineHasNoShell {
