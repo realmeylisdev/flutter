@@ -49,7 +49,7 @@ class LLDB {
   /// to be added, which indicates the process is running.
   ///
   /// Example: (lldb) 1 location added to breakpoint 1
-  static final _lldbProcessResuming = RegExp(r'location added to breakpoint');
+  static final _lldbProcessResuming = RegExp(r'\d+ location added to breakpoint \d+');
 
   /// Pattern of lldb log when the breakpoint is added.
   ///
