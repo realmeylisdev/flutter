@@ -2364,6 +2364,31 @@ extern NSNotificationName const FlutterViewControllerWillDealloc;
   XCTAssertNil(viewController.touchRateCorrectionVSyncClient);
 }
 
+- (void)testCreateTouchRateCorrectionVSyncClientDoesNotCrashWhenEngineHasNoShell {
+  id mockDisplayLinkManager = [OCMockObject mockForClass:[DisplayLinkManager class]];
+  double maxFrameRate = 120;
+  [[[mockDisplayLinkManager stub] andReturnValue:@(maxFrameRate)] displayRefreshRate];
+  FlutterEngine* engine = [[FlutterEngine alloc] init];
+  // Do NOT run engine — shell is nil, so platformTaskRunner returns empty RefPtr.
+  FlutterViewController* viewController = [[FlutterViewController alloc] initWithEngine:engine
+                                                                                nibName:nil
+                                                                                 bundle:nil];
+  [viewController createTouchRateCorrectionVSyncClientIfNeeded];
+  XCTAssertNil(viewController.touchRateCorrectionVSyncClient);
+  [mockDisplayLinkManager stopMocking];
+}
+
+- (void)testSetUpKeyboardAnimationVsyncClientDoesNotCrashWhenEngineHasNoShell {
+  FlutterEngine* engine = [[FlutterEngine alloc] init];
+  // Do NOT run engine — shell is nil, so uiTaskRunner returns empty RefPtr.
+  FlutterViewController* viewController = [[FlutterViewController alloc] initWithEngine:engine
+                                                                                nibName:nil
+                                                                                 bundle:nil];
+  [viewController setUpKeyboardAnimationVsyncClient:^(fml::TimePoint){
+  }];
+  XCTAssertNil(viewController.keyboardAnimationVSyncClient);
+}
+
 - (void)testTriggerTouchRateCorrectionVSyncClientCorrectly {
   id mockDisplayLinkManager = [OCMockObject mockForClass:[DisplayLinkManager class]];
   double maxFrameRate = 120;
